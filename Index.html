@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>about:blank iframe opener (auto)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, "Noto Sans";
+      margin: 0; padding: 20px;
+    }
+    #msg {
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid rgba(127,127,127,.35);
+      border-radius: 10px;
+      white-space: pre-wrap;
+    }
+
+    #banner {
+      display: none;
+      width: 100%;
+      background: red;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="banner">Closing in <span id="count">3</span>…</div>
+  <div id="msg"></div>
+
+  <script>
+    const URL_TO_EMBED = "https://studyworkandmore.uk/";
+    const msg = document.getElementById('msg');
+    const banner = document.getElementById("banner");
+    const countEl = document.getElementById("count");
+
+    function log(t) {
+      msg.textContent = (msg.textContent ? msg.textContent + "\n" : "") + t;
+    }
+
+    // ✅ CLOSE THE REAL PARENT TAB (strongest possible method)
+    function closeParentTab() {
+      // Try closing the entire top window first (works when inside iframe)
+      try { window.top.close(); } catch (e) {}
+
+      // Try closing the current browsing context
+      try { window.close(); } catch (e) {}
+
+      // Break out of iframe, then close
+      try {
+        window.top.open('', '_self', '');
+        window.top.close();
+      } catch (e) {}
+
+      // Final fallback: force navigation away
+      window.top.location.href = "about:blank";
+    }
+
+    function startCountdown() {
+      banner.style.display = "block"; // show immediately
+      let timeLeft = 3;
+      countEl.textContent = timeLeft;
+
+      const interval = setInterval(() => {
+        timeLeft--;
+        countEl.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          closeParentTab();
+        }
+      }, 1000);
+    }
+
+    function openAuto() {
+      const newTab = window.open('', '_blank');
+
+      if (!newTab) {
+        log("Popup was blocked.\n");
+        return;
+      }
+
+      const doc = newTab.document;
+      doc.open();
+      doc.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Iframe Viewer</title>
+  <style>
+    html, body { margin:0; height:100%; }
+    iframe { border:0; width:100%; height:100%; }
+  </style>
+</head>
+<body>
+  <iframe src="${URL_TO_EMBED}" title="Site"></iframe>
+</body>
+</html>`);
+      doc.close();
+
+      log("Popup opened successfully.");
+
+      // ✅ Start countdown ONLY after popup opens
+      startCountdown();
+    }
+
+    // Auto-open immediately
+    openAuto();
+
+    // Load instructions immediately
+    log("If the popup did not open, ensure popups are enabled for this site.\n\n" +
+      "Chrome:  Click the blocked popup icon → Always allow popups from this site.\n" +
+      "Edge:    Same as Chrome.\n" +
+      "Firefox: A bar appears at top → Allow popups.\n" +
+      "Safari:  Preferences → Websites → Pop-up Windows → Allow.");
+  </script>
+</body>
+</html>
