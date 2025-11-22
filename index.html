@@ -1,150 +1,98 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>about:blank iframe opener(auto)</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loading…</title>
   <style>
-    :root {
-      /* Automatically match browser theme */
-      color-scheme: light dark;
-    }
-
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, "Noto Sans";
-      margin: 0; padding: 20px;
-      background: Canvas;
-      color: CanvasText;
+      font-family: system-ui, sans-serif;
+      margin: 2rem;
     }
-
     #msg {
-      margin-top: 20px;
-      padding: 14px;
-      border: 1px solid rgba(127,127,127,.35);
-      border-radius: 10px;
-      white-space: pre-wrap;
-      background: Canvas;
-      color: CanvasText;
+      max-width: 600px;
+      line-height: 1.6;
     }
-
-    #banner {
-      display: none;
-      width: 100%;
-      background: #d60000;
-      color: white;
-      padding: 12px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 18px;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 9999;
-    }
-
-    /* Dark mode adjustments */
-    @media (prefers-color-scheme: dark) {
-      #banner { background: #b00000; }
-    }
+    :root { color-scheme: light dark; }
   </style>
 </head>
 <body>
-
-  <div id="banner">Closing in <span id="count">3</span>…</div>
-  <div id="msg"></div>
+  <div id="msg">Attempting to open site…</div>
 
   <script>
-    const URL_TO_EMBED = "https://studyworkandmore.uk/";
-    const msg = document.getElementById('msg');
-    const banner = document.getElementById("banner");
-    const countEl = document.getElementById("count");
+    const targetUrl = "https://studyworkandmore.uk";
+    let retryTimer = null;
 
-    let popupOpen = false;
-    let popupCheckInterval = null;
+    function tryOpen() {
+      const msg = document.getElementById("msg");
+      msg.textContent = "Opening Popup, this should only take a few seconds…";
 
-    function log(t) {
-      msg.textContent = (msg.textContent ? msg.textContent + "\n" : "") + t;
-    }
+      const popup = window.open("about:blank", "_blank");
 
-    // ✅ Strong "close parent tab" function
-    function closeParentTab() {
-      try { window.top.close(); } catch(e) {}
-      try { window.close(); } catch(e) {}
-      try { 
-        const killer = window.open("", "_self");
-        killer.close();
-      } catch(e) {}
-      window.top.location.href = "about:blank";
-    }
-
-    function startCountdown() {
-      banner.style.display = "block";
-
-      let timeLeft = 3;
-      countEl.textContent = timeLeft;
-
-      const interval = setInterval(() => {
-        timeLeft--;
-        countEl.textContent = timeLeft;
-
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          closeParentTab();
-        }
-      }, 1000);
-    }
-
-    function tryOpenPopup() {
-      if (popupOpen) return; // Safety
-
-      const newTab = window.open('', '_blank');
-
-      if (!newTab) {
-        log("Popup blocked — retrying in 3 seconds…");
+      // If blocked
+      if (!popup) {
+        msg.innerHTML = `
+          <strong>⚠ Pop-up Blocked</strong><br><br>
+          Your browser blocked the new tab.<br><br>
+          <strong>Fix:</strong><br>
+          • Chrome: Click the pop-up blocked icon → “Always allow”, and then confirm<br>
+          • Firefox: Click “Allow pop-ups” in the yellow bar<br>
+          • Edge: Same as Chrome<br><br>
+          Retrying every 3 seconds…
+        `;
         return;
       }
 
-      // ✅ Popup opened successfully
-      popupOpen = true;
-      clearInterval(popupCheckInterval);
+      // Build contents of the about:blank tab
+      popup.opener = null;
 
-      log("✅ Popup opened successfully!");
+      const html = `
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="referrer" content="no-referrer">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>about:blank</title>
+          <style>
+            :root { color-scheme: light dark; }
+            html, body { height: 100%; margin: 0; }
+            iframe { 
+              width: 100%; 
+              height: 100%; 
+              border: 0; 
+            }
+          </style>
+        </head>
+        <body>
+          <iframe
+            src="${targetUrl}"
+            allow="camera; microphone; fullscreen; clipboard-read; clipboard-write; geolocation; autoplay; encrypted-media; web-share; *"
+            allowfullscreen
+            allowpaymentrequest
+            loading="eager"
+            referrerpolicy="no-referrer"
+          ></iframe>
+        </body>
+        </html>
+      `;
 
-      // Write iframe page inside popup
-      const doc = newTab.document;
-      doc.open();
-      doc.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Iframe Viewer</title>
-  <style>
-    html, body { margin:0; height:100%; }
-    iframe { border:0; width:100%; height:100%; }
-  </style>
-</head>
-<body>
-  <iframe src="${URL_TO_EMBED}" title="Site"></iframe>
-</body>
-</html>`);
-      doc.close();
+      // Write to popup
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
 
-      // ✅ Start countdown AFTER popup is open
-      startCountdown();
+      // Success → close parent immediately
+      window.close();
     }
 
-    // ✅ Try immediately once
-    tryOpenPopup();
+    // Try immediately
+    tryOpen();
 
-    // ✅ Then retry every 3 seconds until success
-    popupCheckInterval = setInterval(tryOpenPopup, 3000);
-
-    // Load instructions immediately
-    log("If the popup did not open, ensure popups are enabled.\n\n" +
-      "How to enable popups:\n" +
-      "Chrome/Edge: Click the blocked popup icon → Always allow.\n" +
-      "Firefox: Bar at top → Allow popups.\n" +
-      "Safari: Preferences → Websites → Pop-up Windows → Allow.");
+    // Retry every 3 seconds if blocked
+    retryTimer = setInterval(() => {
+      tryOpen();
+    }, 3000);
   </script>
 </body>
 </html>
